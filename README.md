@@ -35,25 +35,3 @@ while <condition> {
 print("Hello World!");
 print(a);
 ```
-
-## Grammar
-```
-Program -> <Stmt>
-
-<Stmt> -> <Decl> | <If> | <IfElse> | <While> | <Print>
-
-<Decl> -> <Type> <Ident> = <Expr>;
-
-<If> -> if (<Expr>) <Block>
-
-<While> -> while (<Expr>) <Block>
-
-<Block> -> { <Stmt>* }
-
-<Expr> -> <Term> > <Expr> | <Term> < <Expr> | 
-
-<Term>
-
-
-
-```
