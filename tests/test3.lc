@@ -1,0 +1,11 @@
+int x = 27;
+int y = 4;
+
+/* (27 / 4) + (27 % 4) */
+/* 6 + 3 = 9 */
+int result = (x / y) + (x % y);
+print(result); /* Erwartet: 9 */
+
+/* Zuweisung auf sich selbst mit Modulo */
+result = result % 5;
+print(result); /* Erwartet: 4 */

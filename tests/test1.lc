@@ -1,0 +1,16 @@
+int a = 10;
+int b = 3;
+
+/* 1. Einfaches Modulo: 10 % 3 = 1 */
+int r1 = a % b;
+print(r1); /* Erwartet: 1 */
+
+/* 2. Präzedenz: 20 - 10 % 3 * 4 + 8 / 2 */
+/* Rechnung: 20 - (1 * 4) + 4 = 20 - 4 + 4 = 20 */
+int r2 = 20 - a % b * 4 + 8 / 2;
+print(r2); /* Erwartet: 20 */
+
+/* 3. Linksassoziativität: 17 % 5 % 3 */
+/* Rechnung: (17 % 5) % 3 = 2 % 3 = 2 */
+int r3 = 17 % 5 % 3;
+print(r3); /* Erwartet: 2 */
