@@ -17,7 +17,7 @@ Currently `if` and `while` are supported.
 ### If Statement
 
 ```c
-if <condition> {
+if (<condition>) {
     ...
 } 
 ```
@@ -25,7 +25,7 @@ if <condition> {
 ### While Statement
 
 ```c
-while <condition> {
+while (<condition>) {
     ...
 }
 ```
