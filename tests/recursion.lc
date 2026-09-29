@@ -1,0 +1,29 @@
+int factorial(int n) {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+int fib(int n) {
+    if (n <= 0) {
+        return 0;
+    }
+    if (n == 1) {
+        return 1;
+    }
+    /* Doppelter rekursiver Aufruf */
+    return fib(n - 1) + fib(n - 2);
+}
+
+int main() {
+    /* 5! = 5 * 4 * 3 * 2 * 1 = 120 */
+    int fact5 = factorial(5);
+    print(fact5); /* Erwartet: 120 */
+
+    /* Fibonacci: 0, 1, 1, 2, 3, 5, 8, 13 */
+    int fib7 = fib(7);
+    print(fib7); /* Erwartet: 13 */
+
+    return 0;
+}

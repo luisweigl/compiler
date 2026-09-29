@@ -1,0 +1,35 @@
+int square(int x) {
+    return x * x;
+}
+
+int sum_of_squares(int a, int b) {
+    int sa = square(a);
+    int sb = square(b);
+    return sa + sb;
+}
+
+int clamp(int val, int min_val, int max_val) {
+    if (val < min_val) {
+        return min_val;
+    }
+    if (val > max_val) {
+        return max_val;
+    }
+    return val;
+}
+
+int main() {
+    /* 3^2 + 4^2 = 9 + 16 = 25 */
+    int res1 = sum_of_squares(3, 4);
+    print(res1); /* Erwartet: 25 */
+
+    /* clamp(25, 0, 20) -> 20 */
+    int res2 = clamp(res1, 0, 20);
+    print(res2); /* Erwartet: 20 */
+
+    /* clamp(-5, 0, 20) -> 0 */
+    int res3 = clamp(0 - 5, 0, 20);
+    print(res3); /* Erwartet: 0 */
+
+    return 0;
+}

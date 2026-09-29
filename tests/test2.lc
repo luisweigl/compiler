@@ -1,19 +1,24 @@
-int num = 14;
-int is_odd;
+int main() {
+  
+    int num = 14;
+    int is_odd;
 
-if (num % 2 == 1) {
-    is_odd = 1;
+    if (num % 2 == 1) {
+        is_odd = 1;
+    }
+
+    if (num % 2 == 0) {
+        is_odd = 0;
+    }
+
+    print(is_odd); /* Erwartet: 0 */
+
+    num = 17;
+    if (num % 2 == 1) {
+        is_odd = 1;
+    }
+
+    print(is_odd); /* Erwartet: 1 */
+
+    return 0;
 }
-
-if (num % 2 == 0) {
-    is_odd = 0;
-}
-
-print(is_odd); /* Erwartet: 0 */
-
-num = 17;
-if (num % 2 == 1) {
-    is_odd = 1;
-}
-
-print(is_odd); /* Erwartet: 1 */

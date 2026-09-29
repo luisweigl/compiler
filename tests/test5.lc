@@ -1,0 +1,26 @@
+int find_first_divisor(int n) {
+    int d = 2;
+    while (d * d <= n) {
+        if (n % d == 0) {
+            return d; /* Early return aus der Schleife */
+        }
+        d = d + 1;
+    }
+    return n; /* Keine Teiler gefunden -> Zahl ist prim */
+}
+
+int main() {
+    /* 77 ist teilbar durch 7 */
+    int div1 = find_first_divisor(77);
+    print(div1); /* Erwartet: 7 */
+
+    /* 13 ist prim -> 13 */
+    int div2 = find_first_divisor(13);
+    print(div2); /* Erwartet: 13 */
+
+    /* 100 -> 2 */
+    int div3 = find_first_divisor(100);
+    print(div3); /* Erwartet: 2 */
+
+    return 0;
+}

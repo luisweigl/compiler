@@ -84,7 +84,7 @@ impl CodeGenerator {
                 }
             }
             Stmt::While { condition, body } => {
-                self.code += format!("while_{}:\n", counter).as_str();
+                self.code += format!(".L_while_{}:\n", counter).as_str();
                 self.gen_expr(&condition)?;
                 self.code += "pop rax\n";
                 self.code += "cmp rax, 0\n";
