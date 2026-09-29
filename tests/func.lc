@@ -1,0 +1,19 @@
+int add(int a, int b) {
+    return a + b;
+}
+
+int foo() {
+    int bar = 67;
+
+    return bar;
+}
+
+int main() {
+
+    int ergebnis = add(3, 2);
+
+    print(ergebnis);
+    print(foo());
+
+    return 0;
+}

@@ -29,6 +29,29 @@ while (<condition>) {
     ...
 }
 ```
+
+## Functions
+
+The program always starts at the main function:
+
+```c
+int main() {
+    ...
+
+    return 0;
+}
+```
+
+Additional functions can be definied:
+
+```c
+int foo() {
+    int bar = 67;
+    
+    return bar;
+}
+```
+
 ## Printing
 
 ```c

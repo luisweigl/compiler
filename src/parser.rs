@@ -26,7 +26,14 @@ pub enum Stmt {
         condition: Expr,
         body: Vec<Stmt>
     },
-    Print(Expr)
+    Print(Expr),
+    FunctionDef {
+        name: String,
+        return_type: Type,
+        args: Vec<(Type, String)>,
+        block: Vec<Stmt>
+    },
+    Return(Expr)
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +49,10 @@ pub enum Expr {
         op: BinaryOp,
         left: Box<Expr>,
         right: Box<Expr>
+    },
+    FunctionCall {
+        name: String,
+        args: Vec<Expr>,
     }
 }
 
@@ -100,7 +111,7 @@ impl Parser {
         }
     }
 
-    fn expect_string(&mut self) -> Result<String, ParserError> {
+    fn _expect_string(&mut self) -> Result<String, ParserError> {
         let token = &self.tokens[self.current];
 
         match &token.kind {
@@ -114,6 +125,39 @@ impl Parser {
         }
     }
 
+    fn parse_function_call_args(&mut self) -> Result<Vec<Expr>, ParserError> {
+
+        let mut args = Vec::new();
+
+        while self.peek().kind != TokenKind::RPar {
+            args.push(self.parse_expr()?);
+
+            if self.peek().kind != TokenKind::RPar {
+                self.expect(TokenKind::Comma)?;
+            }
+        }
+
+        Ok(args)
+    }
+
+    fn parse_function_definition_args(&mut self) -> Result<Vec<(Type, String)>, ParserError> {
+
+        let mut args = Vec::new();
+
+        while self.peek().kind != TokenKind::RPar {
+            self.expect(TokenKind::Int)?;
+            let ident = self.expect_identifer()?;
+
+            args.push((Type::Int, ident));
+
+            if self.peek().kind != TokenKind::RPar {
+                self.expect(TokenKind::Comma)?;
+            }
+        }
+
+        Ok(args)
+    }
+
     fn parse_term(&mut self) -> Result<Expr, ParserError> {
         let token = self.peek();
 
@@ -124,7 +168,19 @@ impl Parser {
                 },
                 TokenKind::Identifier(_) => {
                     let ident = self.expect_identifer()?;
-                    Ok(Expr::Variable(ident))
+
+                    match self.peek().kind {
+                        TokenKind::LPar => {
+                            self.expect(TokenKind::LPar)?;
+                            let args = self.parse_function_call_args()?;
+                            self.expect(TokenKind::RPar)?;
+
+                            Ok(Expr::FunctionCall { name: ident, args })
+                        },
+                        _ => {
+                            Ok(Expr::Variable(ident))
+                        }
+                    }
                 },
                 TokenKind::LPar => {
                     self.expect(TokenKind::LPar)?;
@@ -142,26 +198,41 @@ impl Parser {
     }
 
     fn parse_decl(&mut self) -> Result<Stmt, ParserError> {
-        let token = self.peek();
-        
-        match token.kind {
+        match self.peek().kind {
             TokenKind::Int => {
                 self.expect(TokenKind::Int)?;
                 let identifier = self.expect_identifer()?;
 
-                if self.peek().kind == TokenKind::Assign {
-                    self.expect(TokenKind::Assign)?;
-                    let init = self.parse_expr()?;
+                match self.peek().kind {
+                    TokenKind::Assign => {
+                        self.expect(TokenKind::Assign)?;
+                        let init = self.parse_expr()?;
 
-                    self.expect(TokenKind::Semi)?;
+                        self.expect(TokenKind::Semi)?;
 
-                    return Ok(Stmt::Decl { var_type: Type::Int, identifier: identifier.to_string(), init: Some(init) });
+                        return Ok(Stmt::Decl { var_type: Type::Int, identifier: identifier.to_string(), init: Some(init) });
+                    }
+                    TokenKind::LPar => {
+                        self.expect(TokenKind::LPar)?;
+                        let args = self.parse_function_definition_args()?;
+                        self.expect(TokenKind::RPar)?;
+
+                        let block = self.parse_block()?;
+
+                        return Ok(Stmt::FunctionDef { name: identifier, return_type: Type::Int, args, block })
+                    },
+                    TokenKind::Semi => {
+                        self.expect(TokenKind::Semi)?;
+                        return Ok(Stmt::Decl { var_type: Type::Int, identifier: identifier.to_string(), init: None});
+                    }
+                    _ => {
+                        let token = self.peek();
+                        return Err(ParserError(format!("Invalid Declaration at line {}, col {}", token.line+1, token.col+1)));
+                    }
                 }
-
-                self.expect(TokenKind::Semi)?;
-                return Ok(Stmt::Decl { var_type: Type::Int, identifier: identifier.to_string(), init: None});
             },
             _ => {
+                let token = self.peek();
                 return Err(ParserError(format!("Expected Type Definiton at line {}, col {}", token.line+1, token.col+1)));
             }
         }
@@ -362,6 +433,13 @@ impl Parser {
             TokenKind::Print => {
                 self.parse_print()
             },
+            TokenKind::Return => {
+                self.expect(TokenKind::Return)?;
+                let expr =  self.parse_expr()?;
+                self.expect(TokenKind::Semi)?;
+
+                Ok(Stmt::Return(expr))
+            }
             _ => {
                 let token = self.peek();
                 Err(ParserError(format!("Expected Statement, found {} at line {}, col {}", token.kind, token.line+1, token.col+1)))

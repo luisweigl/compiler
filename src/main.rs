@@ -2,13 +2,13 @@ use std::process::Command;
 use std::{fs, time::Instant};
 use std::path::PathBuf;
 
-use crate::{codegen::CodeGenerator, lexer::Lexer, parser::Parser, visualization::ast_to_dot};
+use crate::{codegen::CodeGenerator, lexer::Lexer, parser::Parser};
 
 pub mod lexer;
 pub mod parser;
 pub mod codegen;
 pub mod error;
-pub mod visualization;
+//pub mod visualization;
 
 #[derive(clap::Parser, Debug)]
 #[command(name = "lilc", about = "LilC Compiler")]
@@ -17,7 +17,7 @@ struct Args {
     input: PathBuf,
 
     /// name of the executable (optional)
-    #[arg(short, long, default_value = "output")]
+    #[arg(short, long, default_value = "build/output")]
     output: PathBuf,
 
     /// only generate assembly
@@ -45,6 +45,8 @@ fn main() {
         }
     };
 
+    //println!("{:#?}", tokens);
+
     let mut parser = Parser::new(tokens);
     let program = match parser.parse_program() {
         Ok(program) => program,
@@ -53,10 +55,11 @@ fn main() {
             std::process::exit(1);
         }
     };
+    //println!("{:#?}", program);
 
     if args.emit_asm {
-        let dot_output = ast_to_dot(&program);
-        fs::write("ast.dot", dot_output).unwrap();
+        //let dot_output = ast_to_dot(&program);
+        //fs::write("ast.dot", dot_output).unwrap();
     }
 
     Command::new("mkdir").args(["build", "-p"]).status().expect("Failed to create build directory.");

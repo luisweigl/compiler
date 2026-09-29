@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self};
 use crate::error::LexerError;
 
 
@@ -29,6 +29,8 @@ pub enum TokenKind {
     LCurl, // {
     RCurl, // }
     Print, // print
+    Comma, // ,
+    Return, // return
     EOF
 }
 
@@ -73,6 +75,8 @@ impl fmt::Display for TokenKind {
             TokenKind::LCurl =>  write!(f,"{{"),
             TokenKind::RCurl =>  write!(f,"}}"),
             TokenKind::Print =>  write!(f,"print"),
+            TokenKind::Comma => write!(f, ","),
+            TokenKind::Return => write!(f, "return"),
             TokenKind::EOF => write!(f, "EOF")
         }
     }
@@ -210,7 +214,13 @@ impl Lexer {
                             self.current += 1;
                             self.col += 1;
                             return Ok(Some(token));
-                        }
+                        },
+                        b',' => {
+                            let token = self.new_token(TokenKind::Comma);
+                            self.current += 1;
+                            self.col += 1;
+                            return Ok(Some(token));
+                        },
                         b'a'..=b'z' | b'A'..=b'Z' => {
                             self.current += 1;
                             self.state = State::InIdent;
@@ -353,6 +363,7 @@ impl Lexer {
                                 "else" => { self.new_token(TokenKind::Else) },
                                 "while" => { self.new_token(TokenKind::While) },
                                 "print" => { self.new_token(TokenKind::Print) },
+                                "return" => { self.new_token(TokenKind::Return )},
                                 _ => { self.new_token(TokenKind::Identifier(value)) }
                             };
                             self.col += len;

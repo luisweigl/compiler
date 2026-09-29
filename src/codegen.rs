@@ -29,13 +29,15 @@ pub struct CodeGenerator {
     current: usize,
     table: SymbolTable,
     file: File,
+    code: String,
+    in_func: bool
 }
 
 impl CodeGenerator {
     pub fn new(filename: String) -> Result<CodeGenerator, CodegenError> {
         let file = File::create(filename)?;
 
-        Ok(CodeGenerator { current: 0, table: SymbolTable::new(), file })
+        Ok(CodeGenerator { current: 0, table: SymbolTable::new(), file, code: String::new(), in_func: false })
     }
 
     pub fn gen_stmt(&mut self, stmt: &Stmt, counter: &mut usize) -> Result<(), CodegenError> {
@@ -47,8 +49,8 @@ impl CodeGenerator {
                 if let Some(init) = init {
                     self.gen_expr(&init)?;
 
-                    writeln!(self.file, "pop rax")?;
-                    writeln!(self.file, "mov [rbp - {}], rax", offset)?;
+                    self.code += "pop rax\n";
+                    self.code += format!("mov [rbp - {}], rax\n", offset).as_str();
                 }
             }
             Stmt::Assign { identifier, value } => {
@@ -56,14 +58,14 @@ impl CodeGenerator {
 
                 self.gen_expr(&value)?;
 
-                writeln!(self.file, "pop rax")?;
-                writeln!(self.file, "mov [rbp - {}], rax", offset)?;
+                self.code += "pop rax\n";
+                self.code += format!("mov [rbp - {}], rax\n", offset).as_str();
             }
             Stmt::If { condition, then_branch, else_branch } => {
                 self.gen_expr(&condition)?;
-                writeln!(self.file, "pop rax")?;
-                writeln!(self.file, "cmp rax, 0")?;
-                writeln!(self.file, "je endif_{}", counter)?;
+                self.code += "pop rax\n";
+                self.code += "cmp rax, 0\n";
+                self.code += format!("je .L_endif_{}\n", counter).as_str();
 
                 let local_counter = *counter;
 
@@ -72,7 +74,7 @@ impl CodeGenerator {
                     self.gen_stmt(stmt, counter)?;
                 }
 
-                writeln!(self.file, "endif_{}:", local_counter)?;
+                self.code += format!(".L_endif_{}:\n", local_counter).as_str();
 
                 if let Some(else_branch) = else_branch {
                     *counter += 1;
@@ -82,11 +84,11 @@ impl CodeGenerator {
                 }
             }
             Stmt::While { condition, body } => {
-                writeln!(self.file, "while_{}:", counter)?;
+                self.code += format!("while_{}:\n", counter).as_str();
                 self.gen_expr(&condition)?;
-                writeln!(self.file, "pop rax")?;
-                writeln!(self.file, "cmp rax, 0")?;
-                writeln!(self.file, "je end_while_{}", counter)?;
+                self.code += "pop rax\n";
+                self.code += "cmp rax, 0\n";
+                self.code += format!("je .L_end_while_{}\n", counter).as_str();
 
                 let local_counter = *counter;
 
@@ -95,17 +97,55 @@ impl CodeGenerator {
                     self.gen_stmt(stmt, counter)?;
                 }
 
-                writeln!(self.file, "jmp while_{}", local_counter)?;
+                self.code += format!("jmp .L_while_{}\n", local_counter).as_str();
 
-                writeln!(self.file, "end_while_{}:", local_counter)?;
+                self.code += format!(".L_end_while_{}:\n", local_counter).as_str();
             }
             Stmt::Print(value) => {
                 self.gen_expr(&value)?;
-                writeln!(self.file, "pop rdi")?;
-                writeln!(self.file, "call print_int")?;
+                self.code += "pop rdi\n";
+                self.code += "call print_int\n";
 
+            },
+            Stmt::FunctionDef { name, return_type: _, args, block } => {
+                let registers = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+
+                let mut local_table = SymbolTable::new();
+
+                self.code += format!("{}:\n", name).as_str();
+
+                self.code += "push rbp\n";
+                self.code += "mov rbp, rsp\n";
+                self.code += "sub rsp, 32\n";
+
+                self.in_func = true;
+
+                for (i, arg) in args.iter().enumerate() {
+                    let offset = local_table.declare(arg.1.clone());
+                    self.code += format!("mov [rbp - {}], {}\n", offset, registers[i]).as_str();
+                }
+
+                let saved_table = std::mem::replace(&mut self.table, local_table);
+
+                for stmt in block {
+                    self.gen_stmt(stmt, counter)?;
+                }
+
+                self.table = saved_table;
+
+
+                self.code += ".L_epilogue:\n";
+                self.code += "mov rsp, rbp\n";
+                self.code += "pop rbp\n";
+                self.code += "ret\n";
+
+                self.in_func = false;
+            },
+            Stmt::Return(value) => {
+                self.gen_expr(&value)?;
+                self.code += "pop rax\n";
+                self.code += "jmp .L_epilogue\n";
             }
-            _ => {}
         }
         self.current += 1;
 
@@ -116,80 +156,94 @@ impl CodeGenerator {
         match expr {
             Expr::Variable(name) => {
                 let offset = self.table.resolve(name)?;
-                writeln!(self.file, "mov rax, [rbp - {}]", offset)?;
-                writeln!(self.file, "push rax")?;
+                self.code += format!("mov rax, [rbp - {}]\n", offset).as_str();
+                self.code += "push rax\n";
             
             },
             Expr::Int(value) => {
-                writeln!(self.file, "push {}", value)?;
+                self.code += format!("push {}\n", value).as_str();
             },
             Expr::Binary { op, left, right } => {
                 self.gen_expr(left)?;
                 self.gen_expr(right)?;
 
-                writeln!(self.file, "pop rbx")?;
-                writeln!(self.file, "pop rax")?;
+                self.code += "pop rbx\n";
+                self.code += "pop rax\n";
 
                 match op {
                     BinaryOp::Add  => {
-                        writeln!(self.file, "add rax, rbx")?;
-                        writeln!(self.file, "push rax")?;
+                        self.code += "add rax, rbx\n";
+                        self.code += "push rax\n";
                     }
                     BinaryOp::Sub  => {
-                        writeln!(self.file, "sub rax, rbx")?;
-                        writeln!(self.file, "push rax")?;
+                        self.code += "sub rax, rbx\n";
+                        self.code += "push rax\n";
                     }
                     BinaryOp::Mul  => {
-                        writeln!(self.file, "imul rax, rbx")?;
-                        writeln!(self.file, "push rax")?;
+                        self.code += "imul rax, rbx\n";
+                        self.code += "push rax\n";
                     }
                     BinaryOp::Div  => {
-                        writeln!(self.file, "cqo")?;
-                        writeln!(self.file, "idiv rbx")?;
-                        writeln!(self.file, "push rax")?;
+                        self.code += "cqo\n";
+                        self.code += "idiv rbx\n";
+                        self.code += "push rax\n";
                     }
                     BinaryOp::Modulo => {
-                        writeln!(self.file, "cqo")?;
-                        writeln!(self.file, "idiv rbx")?;
-                        writeln!(self.file, "push rdx")?;
+                        self.code += "cqo\n";
+                        self.code += "idiv rbx\n";
+                        self.code += "push rdx\n";
                     }
                     BinaryOp::Equal => {
-                        writeln!(self.file, "cmp rax, rbx")?;
-                        writeln!(self.file, "sete al")?;
-                        writeln!(self.file, "movzx rax, al")?;
-                        writeln!(self.file, "push rax")?;
+                        self.code += "cmp rax, rbx\n";
+                        self.code += "sete al\n";
+                        self.code += "movzx rax, al\n";
+                        self.code += "push rax\n";
                     }
                     BinaryOp::NotEqaul => {
-                        writeln!(self.file, "cmp rax, rbx")?;
-                        writeln!(self.file, "setne al")?;
-                        writeln!(self.file, "movzx rax, al")?;
-                        writeln!(self.file, "push rax")?;
+                        self.code += "cmp rax, rbx\n";
+                        self.code += "setne al\n";
+                        self.code += "movzx rax, al\n";
+                        self.code += "push rax\n";
                     }
                     BinaryOp::LessThan => {
-                        writeln!(self.file, "cmp rax, rbx")?;
-                        writeln!(self.file, "setl al")?;
-                        writeln!(self.file, "movzx rax, al")?;
-                        writeln!(self.file, "push rax")?;
+                        self.code += "cmp rax, rbx\n";
+                        self.code += "setl al\n";
+                        self.code += "movzx rax, al\n";
+                        self.code += "push rax\n";
                     }
                     BinaryOp::LessThanEqual => {
-                        writeln!(self.file, "cmp rax, rbx")?;
-                        writeln!(self.file, "setle al")?;
-                        writeln!(self.file, "movzx rax, al")?;
-                        writeln!(self.file, "push rax")?;
+                        self.code += "cmp rax, rbx\n";
+                        self.code += "setle al\n";
+                        self.code += "movzx rax, al\n";
+                        self.code += "push rax\n";
                     }
                     BinaryOp::GreaterThan => {
-                        writeln!(self.file, "cmp rax, rbx")?;
-                        writeln!(self.file, "setg al")?;
-                        writeln!(self.file, "movzx rax, al")?;
-                        writeln!(self.file, "push rax")?;
+                        self.code += "cmp rax, rbx\n";
+                        self.code += "setg al\n";
+                        self.code += "movzx rax, al\n";
+                        self.code += "push rax\n";
                     }
                     BinaryOp::GreaterThanEqual => {
-                        writeln!(self.file, "cmp rax, rbx")?;
-                        writeln!(self.file, "setge al")?;
-                        writeln!(self.file, "movzx rax, al")?;
-                        writeln!(self.file, "push rax")?;
+                        self.code += "cmp rax, rbx\n";
+                        self.code += "setge al\n";
+                        self.code += "movzx rax, al\n";
+                        self.code += "push rax\n";
                     }
                 }
+            },
+            Expr::FunctionCall { name, args } => {
+                let registers = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"];
+
+                for arg in args {
+                    self.gen_expr(arg)?;
+                }
+
+                for i in (0..args.len()).rev() {
+                    self.code += format!("pop {}\n", registers[i]).as_str();
+                }
+
+                self.code += format!("call {}\n", name).as_str();
+                self.code += "push rax\n";
             }
         }
 
@@ -209,55 +263,50 @@ impl CodeGenerator {
     }
 
     pub fn init(&mut self) -> Result<(), CodegenError> {
-        writeln!(self.file, "global _start")?;
-        writeln!(self.file, "_start:")?;
-        writeln!(self.file, "push rbp")?;
-        writeln!(self.file, "mov rbp, rsp")?;
-        writeln!(self.file, "sub rsp, 128")?;
+        self.code += "global _start\n";
+        self.code += "_start:\n";
+        self.code += "call main\n";
+        self.code += "mov rdi, rax\n";
+        self.code += "mov rax, 60\n";
+        self.code += "syscall\n";
 
         Ok(())
     }
 
     pub fn finish(&mut self) -> Result<(), CodegenError> {
-        writeln!(self.file, "mov rsp, rbp")?;
-        writeln!(self.file, "pop rbp")?;
-
-
-        writeln!(self.file, "mov rax, 60")?;
-        writeln!(self.file, "mov rdi, 0")?;
-        writeln!(self.file, "syscall")?;
-
-
-        writeln!(self.file, "")?;
-        writeln!(self.file, r#"
+        self.code += "\n";
+        self.code += r#"
 print_int:
-mov rax, rdi            ; Die Zahl holen
-mov rbx, 10
-
-push 10                 ; Newline ('\n') als Endzeichen auf den Stack
+    push rbx
+    mov rax, rdi
+    mov rbx, 10
+    push 10
 
 .L_div_loop:
-xor rdx, rdx            ; rdx leeren für Division
-div rbx                 ; rax = rax / 10, rdx = Rest (Ziffer)
-add rdx, '0'            ; Ziffer in ASCII wandeln ('0' bis '9')
-push rdx                ; ASCII-Zeichen direkt auf den Stack legen
-test rax, rax           ; Sind noch Ziffern übrig?
-jnz .L_div_loop
+    xor rdx, rdx
+    div rbx
+    add rdx, '0'
+    push rdx
+    test rax, rax
+    jnz .L_div_loop
 
 .L_print_loop:
-; 1 Byte direkt von [rsp] per sys_write ausgeben
-mov rax, 1              ; sys_write
-mov rdi, 1              ; stdout
-mov rsi, rsp            ; Adresse des aktuellen Zeichens
-mov rdx, 1              ; Länge: 1 Byte
-syscall
+    mov rax, 1
+    mov rdi, 1
+    mov rsi, rsp
+    mov rdx, 1
+    syscall
 
-pop rax                 ; Zeichen vom Stack nehmen
-cmp rax, 10             ; War es das Newline?
-jne .L_print_loop       ; Wenn nein, nächste Ziffer drucken
+    pop rax
+    cmp rax, 10
+    jne .L_print_loop
 
-ret
-                "#)?;
+    pop rbx
+    ret
+                "#;
+
+        write!(self.file, "{}", self.code)?;
+
         Ok(())
     }
 }
